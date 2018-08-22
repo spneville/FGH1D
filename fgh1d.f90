@@ -133,7 +133,7 @@ contains
        ! Make sure that the no. grid points is odd
        if (mod(Npts,2).eq.0) Npts=Npts+1
        ! Grid spacing
-       dx=(bounds(2)-bounds(1))/(Npts-1)
+       dx=(bounds(2)-bounds(1))/(Npts-1)       
     else if (string1.eq.'-ham') then
        ! Hamiltonian name
        i=i+1
@@ -141,6 +141,8 @@ contains
        ! Set the Hamiltonian number
        if (aham.eq.'morsebk') then
           iham=1
+       else if (aham.eq.'morseg') then
+          iham=2
        else
           write(6,'(/,2x,a,/)') 'Unknown Hamiltonian: '//trim(aham)
        stop
@@ -188,6 +190,10 @@ contains
     case(1) ! Balint-Kurti Morse potential
        nvpar=3
 
+    case(2) ! Morse potential used by Guo in
+            ! J. Chem. Phys., 105, 1311 (1996)
+       nvpar=3
+
     end select
        
 !----------------------------------------------------------------------
@@ -210,7 +216,17 @@ contains
        vpar(3)=1.40201d0
        ! reduced mass of H2
        mass=1822.888486192d0/2.0d0
-       
+
+    case(2) ! Guo Morse potential
+       ! Prefactor
+       vpar(1)=1000.0d0
+       ! Exponential 1
+       vpar(2)=0.3d0
+       ! Exponential 2
+       vpar(3)=0.15d0
+       ! Mass
+       mass=1.0d0
+
     end select
        
     return
@@ -242,10 +258,10 @@ contains
 ! Potential contribution
 !----------------------------------------------------------------------
     do i=1,Npts
-       xi=(i-1)*dx
+       xi=bounds(1)+(i-1)*dx
        hmat(i,i)=potfunc(xi)
     enddo
-
+    
 !----------------------------------------------------------------------
 ! Kinetic energy operator contribution
 !----------------------------------------------------------------------
@@ -285,10 +301,13 @@ contains
     real(dp) :: x,potfunc,V
 
     select case(iham)
-
-    case(1) ! ! Balint-Kurti Morse potential
-       call bkmorse(x,V)
        
+    case(1) ! Balint-Kurti Morse potential
+       call bkmorse(x,V)
+
+    case(2) ! Guo Morse potential
+       call guomorse(x,V)
+
     end select
 
     potfunc=V
@@ -316,6 +335,28 @@ contains
     return
     
   end subroutine bkmorse
+
+!######################################################################
+
+  subroutine guomorse(x,V)
+
+    use global
+
+    implicit none
+
+    real(dp) :: x,V,p1,p2,p3
+
+    p1=vpar(1)
+    p2=vpar(2)
+    p3=vpar(3)
+    
+    V=p1*(exp(-p2*x)-2.0d0*exp(-p3*x))
+
+    if (V.gt.100.0d0) V=100.0d0
+    
+    return
+    
+  end subroutine guomorse
     
 !######################################################################
 
@@ -352,9 +393,9 @@ contains
        stop
     endif
 
-!    do i=1,17
-!       print*,(i-1),eigval(i)
-!    enddo
+    do i=1,Npts
+       write(6,'(i5,2x,F11.6)') (i-1),eigval(i)
+    enddo
 
 !    do i=1,Npts
 !       print*,(i-1)*dx,eigvec(i,16)
