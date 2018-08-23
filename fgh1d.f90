@@ -351,7 +351,7 @@ contains
        xi=gbounds(1)+(i-1)*dx
        hmat(i,i)=potfunc(xi)
     enddo
-    
+
 !----------------------------------------------------------------------
 ! Kinetic energy operator contribution
 !----------------------------------------------------------------------
@@ -558,21 +558,14 @@ contains
 !----------------------------------------------------------------------
 ! Set the spectral bounds
 !----------------------------------------------------------------------
-    sbounds(1)=1.01d0*eigval(1)
-    sbounds(2)=1.01d0*eigval(Npts)
+    sbounds(1)=eigval(1)-0.01d0*abs(eigval(1))
+    sbounds(2)=eigval(Npts)+0.01d0*abs(eigval(Npts))
 
 !----------------------------------------------------------------------
-! Set up initial vector
+! Set up the initial vector
 !----------------------------------------------------------------------
-!    do i=1,Npts
-!       call random_number(q0(i))
-!    enddo
-!    q0=q0/sqrt(dot_product(q0,q0))
-
-    ! TEST
-    q0(:)=sum(eigvec(:,1:Npts))
+    q0=1.0d0
     q0=q0/sqrt(dot_product(q0,q0))
-    ! TEST
     
 !----------------------------------------------------------------------
 ! Comput the normalised Hamiltonian matrix
