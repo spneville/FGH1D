@@ -135,6 +135,12 @@ contains
        write(6,'(/,2x,a,/)') 'No arguments given'
        stop
     endif
+
+!----------------------------------------------------------------------
+! Print the input keywords if the -h flag was given
+!----------------------------------------------------------------------
+    call getarg(1,string1)
+    if (string1.eq.'-h') call prhelp
     
 !----------------------------------------------------------------------
 ! Read the command line arguments
@@ -207,6 +213,51 @@ contains
     
   end subroutine rdinput
 
+!######################################################################
+
+  subroutine prhelp
+
+    implicit none
+
+    integer :: i
+    
+!----------------------------------------------------------------------
+! Write the input options to screen then exit
+!----------------------------------------------------------------------
+    ! Purpose
+    write(6,'(/,25a)') ('-',i=1,25)
+    write(6,'(a)') 'Purpose'
+    write(6,'(25a)') ('-',i=1,25)
+    write(6,'(a)') 'Calculates the eigenpairs of a 1D model &
+         potential using the Fourier Grid Hamiltonian method.'
+    write(6,'(a)') 'Additionally, the Chebyshev order-domain &
+         autocorrelation function can be calculated.'
+    
+    ! Usage
+    write(6,'(/,25a)') ('-',i=1,25)
+    write(6,'(a)') 'Usage'
+    write(6,'(25a)') ('-',i=1,25)
+    write(6,'(a)') 'fgh1d -grid -ham (-cheby)'
+
+    ! Options
+    write(6,'(/,25a)') ('-',i=1,25)
+    write(6,'(a)')   'Options'
+    write(6,'(25a)') ('-',i=1,25)
+    write(6,'(a)')     '-ham hamname            : &
+         The name of the model Hamiltonian is ''hamname''.'
+    write(6,'(a)')     '-grid Ea Eb N           : &
+         The grid has N points evenly distributed in the interval &
+         [Ea,Eb]'
+     write(6,'(a)')     '-cheby K                : &
+         The Chebyshev order-domain autocorrelation function &
+         will be calculated to order K'
+
+     stop
+     
+    return
+    
+  end subroutine prhelp
+    
 !######################################################################
 
   subroutine hampar
