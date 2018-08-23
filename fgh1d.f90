@@ -31,7 +31,7 @@ module global
   
   ! Hamiltonian matrix
   real(dp), allocatable :: hmat(:,:)
-
+  
   ! Eigenvectors and eigenvalues
   real(dp), allocatable :: eigvec(:,:)
   real(dp), allocatable :: eigval(:)
@@ -40,6 +40,7 @@ module global
   integer                :: chebyord
   real(dp), dimension(2) :: sbounds
   real(dp), allocatable  :: auto(:)
+  real(dp), allocatable  :: hnorm(:,:)
   logical                :: lcheby
   
 end module global
@@ -85,8 +86,13 @@ program fgh1d
 !----------------------------------------------------------------------
 ! Calculation of the Chebyshev order-domain autocorrelation function
 !----------------------------------------------------------------------
-  if (lcheby) call chebyauto
-  
+  if (lcheby) then
+     ! Calculate the order-domain autocorrelation function
+     call chebyauto
+     ! Output the order-domain autocorrelation function
+     call wrauto     
+  endif
+     
 contains
 
 !######################################################################
@@ -369,7 +375,7 @@ contains
           hmat(j,i)=hmat(i,j)
        enddo
     enddo
-          
+
     return
     
   end subroutine calc_hamiltonian
@@ -552,17 +558,27 @@ contains
 !----------------------------------------------------------------------
 ! Set the spectral bounds
 !----------------------------------------------------------------------
-    sbounds(1)=0.99d0*eigval(1)
-    sbounds(2)=1.01d0*eigval(2)
+    sbounds(1)=1.01d0*eigval(1)
+    sbounds(2)=1.01d0*eigval(Npts)
 
 !----------------------------------------------------------------------
 ! Set up initial vector
 !----------------------------------------------------------------------
-    do i=1,Npts
-       call random_number(q0(i))
-    enddo
-    q0=q0/sqrt(dot_product(q0,q0))
+!    do i=1,Npts
+!       call random_number(q0(i))
+!    enddo
+!    q0=q0/sqrt(dot_product(q0,q0))
 
+    ! TEST
+    q0(:)=sum(eigvec(:,1:Npts))
+    q0=q0/sqrt(dot_product(q0,q0))
+    ! TEST
+    
+!----------------------------------------------------------------------
+! Comput the normalised Hamiltonian matrix
+!----------------------------------------------------------------------
+    call gethnorm
+    
 !----------------------------------------------------------------------
 ! C_0
 !----------------------------------------------------------------------
@@ -578,10 +594,16 @@ contains
     do k=1,chebyord
 
        ! Calculate the kth Chebyhev polynomial-vector product
-       print*,"SORT THIS OUT"       
-       stop
+       !
+       !  H_norm * q_k-1
+       qk=matmul(hnorm,qkm1)
+       !
+       ! 2 * H_norm * q_k-1
+       if (k.gt.1) qk=2.0d0*qk
+       !
+       ! q_k = 2 * H_norm * q_k-1 - q_k-2 (k>2)
+       if (k.gt.1) qk=qk-qkm2
        
-
        ! Calculate C_k
        auto(k)=dot_product(q0,qk)
 
@@ -609,6 +631,105 @@ contains
     return
     
   end subroutine chebyauto
+
+!######################################################################
+
+  subroutine gethnorm
+
+    use global
+
+    implicit none
+
+    integer  :: i
+    real(dp) :: DeltaE,Emin
+
+!    ! TEST
+!    integer :: error
+!    real(dp), dimension(3*Npts)    :: work
+!    real(dp), dimension(Npts,Npts) :: vec
+!    real(dp), dimension(Npts)      :: val
+!    ! TEST
+    
+!----------------------------------------------------------------------
+! Allocate arrays
+!----------------------------------------------------------------------
+    allocate(hnorm(Npts,Npts))
+    hnorm=0.0d0
+    
+!----------------------------------------------------------------------
+! Compute the normalised Hamiltonian matrix
+!----------------------------------------------------------------------
+    Emin=sbounds(1)
+    DeltaE=sbounds(2)-sbounds(1)
+
+!    ! TEST
+!    Emin=eigval(1)
+!    DeltaE=eigval(Npts)-eigval(1)
+!    ! TEST
+    
+    hnorm=hmat
+    do i=1,Npts
+       hnorm(i,i)=hnorm(i,i)-0.5d0*DeltaE-Emin
+    enddo
+    hnorm=2.0d0*hnorm/DeltaE
+
+
+!    ! TEST
+!    vec=hnorm    
+!    call dsyev('V','U',Npts,vec,Npts,val,work,3*Npts,error)
+!    if (error.ne.0) then
+!       write(6,'(/,2x,a)') 'Error in the diagonalisation of Hnorm'
+!       stop
+!    endif
+!    do i=1,Npts
+!       print*,i,val(i)
+!    enddo
+!    stop
+!    ! TEST
+
+    
+    return
+    
+  end subroutine gethnorm
+
+!######################################################################
+
+  subroutine wrauto
+
+    use global
+
+    implicit none
+
+    integer :: unit,k
+    
+!----------------------------------------------------------------------
+! Open the output file
+!----------------------------------------------------------------------
+    unit=30
+    open(unit,file='chebyauto',form='formatted',status='unknown')
+
+!----------------------------------------------------------------------
+! Write the file header
+!----------------------------------------------------------------------
+    write(unit,'(a,2(2x,E21.14),/)') '#    Spectral bounds:',&
+         sbounds(1),sbounds(2)
+    write(unit,'(a)')   '#    Order [k]    C_k'
+    
+!----------------------------------------------------------------------
+! Write the order-domain autocorrelation function to file
+!----------------------------------------------------------------------
+    do k=0,chebyord*2
+       write(unit,'(i6,11x,E21.14)') k,auto(k)
+    enddo
+    
+!----------------------------------------------------------------------
+! Close the output file
+!----------------------------------------------------------------------
+    close(unit)
+    
+    return
+    
+  end subroutine wrauto
     
 !######################################################################
   
