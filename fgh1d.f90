@@ -13,7 +13,7 @@ module global
   integer :: Npts
 
   ! Grid bounds
-  real(dp), dimension(2) :: bounds
+  real(dp), dimension(2) :: gbounds
 
   ! Grid spacing
   real(dp) :: dx
@@ -35,6 +35,12 @@ module global
   ! Eigenvectors and eigenvalues
   real(dp), allocatable :: eigvec(:,:)
   real(dp), allocatable :: eigval(:)
+
+  ! Chebyshev order-domain autocorrelation function
+  integer                :: chebyord
+  real(dp), dimension(2) :: sbounds
+  real(dp), allocatable  :: auto(:)
+  logical                :: lcheby
   
 end module global
 
@@ -70,6 +76,16 @@ program fgh1d
 ! Diagonalise the Hamiltonian matrix
 !----------------------------------------------------------------------
   call diag_hamiltonian
+
+!----------------------------------------------------------------------
+! Output the eigenvalues
+!----------------------------------------------------------------------
+  call wreig
+  
+!----------------------------------------------------------------------
+! Calculation of the Chebyshev order-domain autocorrelation function
+!----------------------------------------------------------------------
+  if (lcheby) call chebyauto
   
 contains
 
@@ -88,10 +104,14 @@ contains
     Npts=0
 
     ! Grid bounds
-    bounds=-999.0d0
+    gbounds=-999.0d0
 
     ! Name of the model Hamiltonian
     aham=''
+
+    ! Chebyshev order-domain autocorrelation function calculation
+    lcheby=.false.
+    chebyord=0    
     
     return
     
@@ -109,6 +129,14 @@ contains
     character(len=80) :: string1,string2
 
 !----------------------------------------------------------------------
+! Exit if no arguments were given
+!----------------------------------------------------------------------
+    if (iargc().eq.0) then
+       write(6,'(/,2x,a,/)') 'No arguments given'
+       stop
+    endif
+    
+!----------------------------------------------------------------------
 ! Read the command line arguments
 !----------------------------------------------------------------------
     i=0
@@ -121,11 +149,11 @@ contains
        ! Lower bound of the grid
        i=i+1
        call getarg(i,string2)
-       read(string2,*) bounds(1)
+       read(string2,*) gbounds(1)
        ! Upper bound of the grid
        i=i+1
        call getarg(i,string2)
-       read(string2,*) bounds(2)
+       read(string2,*) gbounds(2)
        ! No. grid points
        i=i+1
        call getarg(i,string2)
@@ -133,7 +161,7 @@ contains
        ! Make sure that the no. grid points is odd
        if (mod(Npts,2).eq.0) Npts=Npts+1
        ! Grid spacing
-       dx=(bounds(2)-bounds(1))/(Npts-1)       
+       dx=(gbounds(2)-gbounds(1))/(Npts-1)       
     else if (string1.eq.'-ham') then
        ! Hamiltonian name
        i=i+1
@@ -147,6 +175,11 @@ contains
           write(6,'(/,2x,a,/)') 'Unknown Hamiltonian: '//trim(aham)
        stop
        endif
+    else if (string1.eq.'-cheby') then
+       lcheby=.true.
+       i=i+1
+       call getarg(i,string2)
+       read(string2,*) chebyord
     else
        write(6,'(/,2x,a,/)') 'Unknown keyword: '//trim(string1)
        stop
@@ -258,7 +291,7 @@ contains
 ! Potential contribution
 !----------------------------------------------------------------------
     do i=1,Npts
-       xi=bounds(1)+(i-1)*dx
+       xi=gbounds(1)+(i-1)*dx
        hmat(i,i)=potfunc(xi)
     enddo
     
@@ -392,15 +425,7 @@ contains
        write(6,'(/,2x,a)') 'Error in the diagonalisation of H'
        stop
     endif
-
-    do i=1,Npts
-       write(6,'(i5,2x,F11.6)') (i-1),eigval(i)
-    enddo
-
-!    do i=1,Npts
-!       print*,(i-1)*dx,eigvec(i,16)
-!    enddo
-       
+    
 !----------------------------------------------------------------------
 ! Deallocate arrays
 !----------------------------------------------------------------------
@@ -409,6 +434,130 @@ contains
     return
     
   end subroutine diag_hamiltonian
+
+!######################################################################
+
+  subroutine wreig
+
+    use global
+
+    implicit none
+
+    integer           :: unit,i
+    character(len=80) :: filename
+    
+!----------------------------------------------------------------------
+! Open the energy file
+!----------------------------------------------------------------------
+    unit=20
+    filename=trim(aham)//'_ener.dat'
+    open(unit,file=filename,form='formatted',status='unknown')
+
+!----------------------------------------------------------------------
+! Write the energies to file
+!----------------------------------------------------------------------
+    do i=1,Npts
+       write(unit,'(x,i5,2x,F13.8)') (i-1),eigval(i)
+    enddo
+
+!----------------------------------------------------------------------
+! Close the energy file
+!----------------------------------------------------------------------
+    close(unit)
+    
+    return
+    
+  end subroutine wreig
+    
+!######################################################################
+
+  subroutine chebyauto
+
+    use global
+
+    implicit none
+
+    integer               :: i,k
+    real(dp), allocatable :: q0(:),qk(:),qkm1(:),qkm2(:)
+
+!----------------------------------------------------------------------
+! Allocate arrays
+!----------------------------------------------------------------------
+    allocate(auto(0:2*chebyord))
+    auto=0.0d0
+
+    allocate(q0(Npts))
+    q0=0.0d0
+
+    allocate(qk(Npts))
+    qk=0.0d0
+
+    allocate(qkm1(Npts))
+    qkm1=0.0d0
+
+    allocate(qkm2(Npts))
+    qkm2=0.0d0
+    
+!----------------------------------------------------------------------
+! Set the spectral bounds
+!----------------------------------------------------------------------
+    sbounds(1)=0.99d0*eigval(1)
+    sbounds(2)=1.01d0*eigval(2)
+
+!----------------------------------------------------------------------
+! Set up initial vector
+!----------------------------------------------------------------------
+    do i=1,Npts
+       call random_number(q0(i))
+    enddo
+    q0=q0/sqrt(dot_product(q0,q0))
+
+!----------------------------------------------------------------------
+! C_0
+!----------------------------------------------------------------------
+    auto(0)=dot_product(q0,q0)
+
+!----------------------------------------------------------------------
+! Calculate the Chebyshev order-domain autocorrelation function
+!----------------------------------------------------------------------
+    ! Initialisation
+    qkm1=q0
+
+    ! Loop over Chebyshev polynomials of order k >= 1
+    do k=1,chebyord
+
+       ! Calculate the kth Chebyhev polynomial-vector product
+       print*,"SORT THIS OUT"       
+       stop
+       
+
+       ! Calculate C_k
+       auto(k)=dot_product(q0,qk)
+
+       ! Calculate C_2k and C_2k-1
+       if (k.gt.chebyord/2) then
+          auto(2*k)=2.0d0*dot_product(qk,qk)-auto(0)
+          auto(2*k-1)=2.0d0*dot_product(qkm1,qk)-auto(1)
+       endif
+
+       ! Update qkm1 and qkm2
+       qkm2=qkm1       
+       qkm1=qk
+       qk=0.0d0
+       
+    enddo
+       
+!----------------------------------------------------------------------
+! Deallocate arrays
+!----------------------------------------------------------------------
+    deallocate(q0)
+    deallocate(qk)
+    deallocate(qkm1)
+    deallocate(qkm2)
+    
+    return
+    
+  end subroutine chebyauto
     
 !######################################################################
   
